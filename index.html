@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Comparador</title>
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1f6f5c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Comparador"><text y=%22.9em%22 font-size=%2290%22>⚖️</text></svg>">
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#eef1ee; --paper:#ffffff; --ink:#1d2623; --muted:#6b7773;
+  --line:#c9d2ce; --head:#dfe8e3; --accent:#1f6f5c; --sel:#e3f2ec; --danger:#b3392f;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141a18; --paper:#1c2421; --ink:#e6ece9; --muted:#8e9c97;
+    --line:#33403b; --head:#26322e; --accent:#5ec2a5; --sel:#23382f; --danger:#e57a70;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141a18; --paper:#1c2421; --ink:#e6ece9; --muted:#8e9c97;
+  --line:#33403b; --head:#26322e; --accent:#5ec2a5; --sel:#23382f; --danger:#e57a70;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 "Segoe UI",system-ui,-apple-system,Roboto,sans-serif;min-height:100vh}
+main{max-width:900px;margin:0 auto;padding:20px 14px 60px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+.bar h1{font-size:20px;margin:0 auto 0 0;font-weight:650}
+button{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:7px 12px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+:root:not([data-theme="light"]) button.primary{color:#0e1512}
+button:focus-visible,[contenteditable]:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.wrap{overflow-x:auto;background:var(--paper);border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;table-layout:fixed}
+th,td{border:1px solid var(--line);padding:0;vertical-align:top}
+th{background:var(--head);font-weight:600;text-align:left}
+th:first-child,td:first-child{width:30%}
+td.act{width:30px;border:none;text-align:center;vertical-align:middle;background:transparent}
+.cell{display:block;min-height:40px;padding:9px 11px;white-space:pre-wrap;word-break:break-word;outline:none}
+td:focus-within,th:focus-within{background:var(--sel)}
+tbody td:first-child .cell{font-weight:550}
+.del{border:none;background:none;color:var(--muted);padding:4px 5px;font-size:18px;line-height:1}
+.del:hover{color:var(--danger)}
+.hint{color:var(--muted);font-size:13px;margin-top:12px}
+.addrow{display:block;width:100%;margin-top:10px;padding:10px;background:transparent;border:1px dashed var(--line);color:var(--muted)}
+.addrow:hover{border-color:var(--accent);color:var(--ink)}
+.imgslot{position:relative;padding:6px}
+.imgslot img{display:block;width:100%;max-height:180px;object-fit:contain;border-radius:4px;background:var(--bg)}
+.imgadd{width:100%;font-size:13px;color:var(--muted);border-style:dashed;padding:8px 4px}
+.imgdel{position:absolute;top:10px;right:10px;padding:0 7px;line-height:22px;border-radius:50%;font-size:16px}
+@media (max-width:600px){main{padding:12px 6px 40px}body{font-size:14px}.cell{padding:7px 6px;min-height:36px}.bar h1{font-size:18px}}
+</style>
+</head>
+<body>
+<main>
+  <div class="bar">
+    <h1>Comparador</h1>
+    <button id="clear">Limpar</button>
+  </div>
+  <div class="wrap">
+    <table>
+      <thead><tr id="head"></tr></thead>
+      <tbody id="body"></tbody>
+    </table>
+  </div>
+  <button id="add" class="addrow">+ Linha</button>
+  <p class="hint">Clique numa célula para editar. Enter na última linha cria outra; Shift+Enter quebra a linha. Para apagar uma linha, esvazie-a e carregue em Backspace. Tudo fica guardado neste navegador.</p>
+</main>
+<script>
+(function(){
+  var KEY="comparador-v1";
+  var data={head:["Característica","Opção A","Opção B"],rows:[["","",""],["","",""],["","",""]]};
+  try{var s=localStorage.getItem(KEY);if(s){var p=JSON.parse(s);if(p&&p.head&&p.rows)data=p;}}catch(e){}
+  if(!data.imgs)data.imgs=[null,null,null];
+  var headEl=document.getElementById("head"),body=document.getElementById("body");
+
+  function save(){try{localStorage.setItem(KEY,JSON.stringify(data));}catch(e){}}
+  function cell(text,onInput,onKey){
+    var d=document.createElement("div");
+    d.className="cell";d.contentEditable="true";d.spellcheck=false;d.textContent=text;
+    d.addEventListener("input",function(){onInput(d.innerText.replace(/\n$/,""));});
+    d.addEventListener("keydown",onKey);
+    d.addEventListener("paste",function(e){e.preventDefault();
+      var t=(e.clipboardData||window.clipboardData).getData("text");
+      document.execCommand("insertText",false,t);});
+    return d;
+  }
+  function imgSlot(i){
+    var box=document.createElement("div");box.className="imgslot";
+    if(data.imgs[i]){
+      var im=document.createElement("img");im.src=data.imgs[i];im.alt="Imagem de "+(data.head[i]||"opção");
+      box.appendChild(im);
+      var x=document.createElement("button");x.className="imgdel";x.textContent="×";x.title="Remover imagem";x.setAttribute("aria-label","Remover imagem");
+      x.onclick=function(){data.imgs[i]=null;save();render();};
+      box.appendChild(x);
+    }else{
+      var b=document.createElement("button");b.className="imgadd";b.textContent="+ Imagem";
+      var f=document.createElement("input");f.type="file";f.accept="image/*";f.hidden=true;
+      b.onclick=function(){f.click();};
+      f.onchange=function(){
+        var file=f.files[0];if(!file)return;
+        var rd=new FileReader();
+        rd.onload=function(){
+          var img=new Image();
+          img.onload=function(){
+            var s=Math.min(1,500/Math.max(img.width,img.height));
+            var c=document.createElement("canvas");c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);
+            c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+            data.imgs[i]=c.toDataURL("image/jpeg",0.8);save();render();
+          };
+          img.src=rd.result;
+        };
+        rd.readAsDataURL(file);
+      };
+      box.appendChild(b);box.appendChild(f);
+    }
+    return box;
+  }
+  function focusCell(r,c){
+    var tr=body.children[r];if(!tr)return;
+    var el=tr.children[c]&&tr.children[c].querySelector(".cell");
+    if(el){el.focus();var rg=document.createRange();rg.selectNodeContents(el);rg.collapse(false);
+      var sel=getSelection();sel.removeAllRanges();sel.addRange(rg);}
+  }
+  function render(){
+    headEl.innerHTML="";
+    data.head.forEach(function(h,i){
+      var th=document.createElement("th");
+      th.appendChild(cell(h,function(v){data.head[i]=v;save();},function(e){
+        if(e.key==="Enter"){e.preventDefault();focusCell(0,i);}
+      }));
+      if(i>0)th.appendChild(imgSlot(i));
+      headEl.appendChild(th);
+    });
+    body.innerHTML="";
+    data.rows.forEach(function(row,r){
+      var tr=document.createElement("tr");
+      row.forEach(function(v,c){
+        var td=document.createElement("td");
+        td.appendChild(cell(v,function(t){data.rows[r][c]=t;save();},function(e){
+          if(e.key==="Enter"&&!e.shiftKey){
+            e.preventDefault();
+            if(r===data.rows.length-1){addRow(c);}else{focusCell(r+1,c);}
+          }else if(e.key==="ArrowDown"&&e.altKey){e.preventDefault();focusCell(r+1,c);}
+          else if(e.key==="ArrowUp"&&e.altKey){e.preventDefault();focusCell(r-1,c);}
+          else if(e.key==="Backspace"&&data.rows.length>1&&data.rows[r].every(function(x){return !x;})){
+            e.preventDefault();data.rows.splice(r,1);save();render();focusCell(Math.max(0,r-1),c);
+          }
+        }));
+        tr.appendChild(td);
+      });
+      body.appendChild(tr);
+    });
+  }
+  function addRow(focusCol){
+    data.rows.push(["","",""]);save();render();
+    focusCell(data.rows.length-1,focusCol||0);
+  }
+  document.getElementById("add").onclick=function(){addRow(0);};
+  document.getElementById("clear").onclick=function(){
+    if(confirm("Apagar todo o conteúdo da tabela?")){
+      data.rows=data.rows.map(function(){return ["","",""];});save();render();
+    }
+  };
+  render();
+})();
+</script>
+<script>
+if("serviceWorker" in navigator){
+  window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});
+}
+</script>
+</body>
+</html>
